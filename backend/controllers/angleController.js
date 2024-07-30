@@ -1,5 +1,6 @@
-//const multer = require('multer');
 const Angle = require("./../models/Angle");
+const fs = require("fs");
+const path = require("path");
 
 // Preprocess border_radius field
 function processBorderRadius(border_radius) {
@@ -63,26 +64,38 @@ const AddAngleCtrl = async (req, res) => {
  * @access  private     
  ------------------------------------------------*/
  const getAnglesWithPginationCtrl = async (req, res) => {
-    try {
-      const { page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
-      const skip = (page - 1) * limit;
-  
-      const angles = await Angle.find({})
-                                .skip(Number(skip))
-                                .limit(Number(limit));
-  
-      const totalAngles = await Angle.countDocuments();
-  
-      return res.status(200).json({
-        angles,
-        totalAngles,
-        totalPages: Math.ceil(totalAngles / limit),
-        currentPage: Number(page)
-      });
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: 'Error fetching angles', error });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const filterStatus = req.query.status || "";
+
+  try {
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { Angle_name: { $regex: search, $options: "i" } },
+      ];
     }
+
+    if (filterStatus) {
+      query.status = filterStatus;
+    }
+
+    const angles = await Angle.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const count = await Angle.countDocuments(query); // Use the same query for counting documents
+
+    return res.json({
+      angles,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching angles', error });
+  }
   };
 
 /**-----------------------------------------------
@@ -103,5 +116,41 @@ const AddAngleCtrl = async (req, res) => {
     }
   };
 
-module.exports = { AddAngleCtrl , getAnglesWithPginationCtrl,getAnglesCtrl};
+
+
+    /**-----------------------------------------------
+ * @desc    Delete angle by ID
+ * @route   /api/deleteangle/:id
+ * @method  DELETE
+ * @access  private
+ ------------------------------------------------*/
+ const deleteAngle = async (req, res) => {
+  const angleId = req.params.id;
+
+  try {
+    const angle = await Angle.findById(angleId);
+    if (!angle) {
+      return res.status(404).json({ message: "Angle not found", result: false });
+    }
+
+    // Check if angle has an image and remove it
+    if (angle.avatarAngle) {
+      const imagePath = path.join(__dirname, "..", "uploads", "Angle", angle.avatarAngle);
+      console.log(imagePath);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    //await Angle.findByIdAndDelete(angleId);
+
+    return res.status(200).json({ message: "Angle deleted successfully", result: true });
+  } catch (error) {
+    console.error("Error deleting angle:", error);
+    return res.status(500).json({ message: "Internal server error.", result: false });
+  }
+
+};
+
+module.exports = { AddAngleCtrl , getAnglesWithPginationCtrl,getAnglesCtrl, deleteAngle};
 

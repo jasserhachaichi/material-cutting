@@ -1,24 +1,6 @@
-//const multer = require('multer');
 const Material = require("../models/Material");
-//const path = require("path");
-
-/* function getRandomNumber(maxLength) {
-    const max = Math.pow(10, maxLength) - 1;
-    return Math.floor(Math.random() * max);
-}
-  
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, 'uploads/Material/');
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      const randomNum = getRandomNumber(7);
-      cb(null, `${file.fieldname + '-' + randomNum + '-' + Date.now() + ext}`);
-    }
-});
-  
-const uploadMT = multer({ storage }); */
+const fs = require("fs");
+const path = require("path");
 
 // Preprocess thickness field
 function processThickness(thickness) {
@@ -84,26 +66,38 @@ const AddMaterialCtrl = async (req, res) => {
  * @access  private     
  ------------------------------------------------*/
  const getMaterialsWithPginationCtrl = async (req, res) => {
-    try {
-      const { page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
-      const skip = (page - 1) * limit;
-  
-      const materials = await Material.find({})
-                                .skip(Number(skip))
-                                .limit(Number(limit));
-  
-      const totalMaterials = await Material.countDocuments();
-  
-      return res.status(200).json({
-        materials,
-        totalMaterials,
-        totalPages: Math.ceil(totalMaterials / limit),
-        currentPage: Number(page)
-      });
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: 'Error fetching materials', error });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const filterStatus = req.query.status || "";
+
+  try {
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { material_name: { $regex: search, $options: "i" } },
+      ];
     }
+
+    if (filterStatus) {
+      query.status = filterStatus;
+    }
+
+    const materials = await Material.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const count = await Material.countDocuments(query); // Use the same query for counting documents
+
+    return res.json({
+      materials,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching materials', error });
+  }
   };
 
 /**-----------------------------------------------
@@ -128,6 +122,39 @@ const AddMaterialCtrl = async (req, res) => {
 
 
 
+        /**-----------------------------------------------
+ * @desc    Delete material by ID
+ * @route   /product/deletematerial/:id
+ * @method  DELETE
+ * @access  private
+ ------------------------------------------------*/
+ const deleteMaterial = async (req, res) => {
+  const materialId = req.params.id;
+
+  try {
+    const material = await Material.findById(materialId);
+    if (!material) {
+      return res.status(404).json({ message: "Material not found", result: false });
+    }
+
+    // Check if material has an image and remove it
+    if (material.avatarMaterial) {
+      const imagePath = path.join(__dirname, "..", "uploads", "Material", material.avatarMaterial);
+      console.log(imagePath);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    await Material.findByIdAndDelete(materialId);
+
+    return res.status(200).json({ message: "Material deleted successfully", result: true });
+  } catch (error) {
+    console.error("Error deleting material:", error);
+    return res.status(500).json({ message: "Internal server error.", result: false });
+  }
+
+};
 
 
 
@@ -149,5 +176,8 @@ const AddMaterialCtrl = async (req, res) => {
 
 
 
-module.exports = { AddMaterialCtrl , getMaterialsWithPginationCtrl,getMaterialsCtrl};
+
+
+
+module.exports = { AddMaterialCtrl , getMaterialsWithPginationCtrl,getMaterialsCtrl, deleteMaterial};
 //module.exports = { uploadMT ,AddMaterialCtrl};

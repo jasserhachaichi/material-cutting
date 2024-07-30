@@ -1,4 +1,6 @@
 const MaterialType = require("../models/MaterialType");
+const fs = require("fs");
+const path = require("path");
 
 
 /**-----------------------------------------------
@@ -85,6 +87,80 @@ const AddMaterialTypeCtrl = async (req, res) => {
 
 
 
+/**-----------------------------------------------
+ * @desc    Get All MaterialTypes with pagination
+ * @route   /product/materialtypes
+ * @method  GET
+ * @access  private     
+ ------------------------------------------------*/
+ const getMaterialTypesWithPginationCtrl = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const filterStatus = req.query.status || "";
+
+  try {
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { materialType_name: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (filterStatus) {
+      query.status = filterStatus;
+    }
+
+    const materialtypes = await MaterialType.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const count = await MaterialType.countDocuments(query); // Use the same query for counting documents
+
+    return res.json({
+      materialtypes,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching material types', error });
+  }
+  };
+
+        /**-----------------------------------------------
+ * @desc    Delete materialtype by ID
+ * @route   /product/deletematerialtype/:id
+ * @method  DELETE
+ * @access  private
+ ------------------------------------------------*/
+ const deleteMaterialType = async (req, res) => {
+  const materialtypeId = req.params.id;
+
+  try {
+    const materialtype = await MaterialType.findById(materialtypeId);
+    if (!materialtype) {
+      return res.status(404).json({ message: "Material Type not found", result: false });
+    }
+
+    // Check if materialtype has an image and remove it
+    if (materialtype.avatarMaterialType) {
+      const imagePath = path.join(__dirname, "..", "uploads", "MaterialType", materialtype.avatarMaterialType);
+      console.log(imagePath);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    await MaterialType.findByIdAndDelete(materialtypeId);
+
+    return res.status(200).json({ message: "Material Type deleted successfully", result: true });
+  } catch (error) {
+    console.error("Error deleting material type:", error);
+    return res.status(500).json({ message: "Internal server error.", result: false });
+  }
+
+};
 
 
 
@@ -105,7 +181,5 @@ const AddMaterialTypeCtrl = async (req, res) => {
 
 
 
-
-
-module.exports = { AddMaterialTypeCtrl,getMaterialTypesCtrl};
+module.exports = { AddMaterialTypeCtrl,getMaterialTypesCtrl, getMaterialTypesWithPginationCtrl, deleteMaterialType};
 

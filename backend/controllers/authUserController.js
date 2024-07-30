@@ -151,6 +151,8 @@ module.exports.registergoogleClientCtrl = async (req, res) => {
       const token = generateToken({
         id: newClient._id,
         email: newClient.email
+        , role : newClient.role
+        ,imageUrl:newClient.imageUrl, image:newClient.image,firstName: newClient.firstName, lastName:newClient.lastName 
       });
       // Set cookie with 60 days expiration
       res.cookie("token", token, {
@@ -165,6 +167,10 @@ module.exports.registergoogleClientCtrl = async (req, res) => {
       return res
         .status(200)
         .json({ result: true, message: "Login successful", token });
+    }else{
+      return res
+      .status(200)
+      .json({ message: "This email is already registered.", result: false });
     }
   } catch (error) {
     console.error("Error registering client:", error);
@@ -211,7 +217,7 @@ module.exports.loginUserCtrl = async (req, res) => {
     const foundToken = await findTokenForUser(user._id);
 
     if (!foundToken) {
-      const token = generateToken({ id: user._id, email: user.email });
+      const token = generateToken({ id: user._id, email: user.email, role : user.role,imageUrl:user.imageUrl, image:user.image,firstName: user.firstName, lastName:user.lastName   });
       //console.log("Token: " + token);
 
       // Set cookie with 60 days expiration
@@ -258,8 +264,8 @@ module.exports.loginUserCtrl = async (req, res) => {
         .status(200)
         .json({ result: false, message: "This user address is not exist." }); //400
     }
-
-      const token = generateToken({ id: client._id, email: client.email });
+    console.log(client.role);
+      const token = generateToken({ id: client._id, email: client.email , role : client.role,imageUrl:client.imageUrl, image:client.image,firstName: client.firstName, lastName:client.lastName });
       //console.log("Token: " + token);
 
       // Set cookie with 60 days expiration
@@ -270,7 +276,7 @@ module.exports.loginUserCtrl = async (req, res) => {
         //sameSite: 'Strict', // helps prevent CSRF attacks
       });
 
-      console.log(req.cookies);
+      //console.log("req.cookies: " + req.cookies);
 
       return res
         .status(200)

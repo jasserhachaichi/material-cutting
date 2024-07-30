@@ -30,25 +30,37 @@ const upload = multer({ storage }); */
  * @access  private     
  ------------------------------------------------*/
  const getShapesWithPginationCtrl = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const filterStatus = req.query.status || "";
+
   try {
-    const { page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
-    const skip = (page - 1) * limit;
+    const query = {};
 
-    const shapes = await Shape.find({})
-                              .skip(Number(skip))
-                              .limit(Number(limit));
+    if (search) {
+      query.$or = [
+        { shapeName: { $regex: search, $options: "i" } },
+      ];
+    }
 
-    const totalShapes = await Shape.countDocuments();
+    if (filterStatus) {
+      query.status = filterStatus;
+    }
 
-    return res.status(200).json({
+    const shapes = await Shape.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const count = await Shape.countDocuments(query);
+
+    return res.json({
       shapes,
-      totalShapes,
-      totalPages: Math.ceil(totalShapes / limit),
-      currentPage: Number(page)
+      totalPages: Math.ceil(count / limit),
+      currentPage: page
     });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ message: 'Error fetching shapes', error });
+    res.status(500).json({ message: 'Error fetching shapes', error });
   }
 };
 
@@ -72,31 +84,6 @@ const upload = multer({ storage }); */
 
 
 
-
-
-
-
-
-
-
-
-
-/**-----------------------------------------------
- * @desc    Get image of Shape
- * @route   /product/image/:filename
- * @method  GET
- * @access  private     
- ------------------------------------------------*/
-/*  const getShapesImg =(req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, '../uploads', filename); // Construct the file path
-
-  res.sendFile(filePath, err => {
-    if (err) {
-      res.status(404).json({ message: 'Image not found' });
-    }
-  });
-}; */
 
 
 /**-----------------------------------------------
@@ -156,48 +143,51 @@ const upload = multer({ storage }); */
  * @access  private     
  ------------------------------------------------*/
  const deleteShapeCtrl = async (req, res) => {
+  const shapeId = req.params.id;
+  
   try {
-    const shapeId = req.params.id;
     const shape = await Shape.findById(shapeId);
-
     if (!shape) {
-      return res.status(404).json({ message: 'Shape not found' });
+      return res.status(404).json({ message: "Shape not found", result: false });
     }
 
-    // Delete associated images
-    if (shape.avatarShapeImg) {
-      const avatarShapePath = path.join(__dirname, '..', 'uploads', shape.avatarShapeImg);
-      fs.unlink(avatarShapePath, err => {
-        if (err) console.error(`Error deleting avatarShapeImg: ${err}`);
-      });
-    }
-
-    if (shape.avatarEdgeImg) {
-      const avatarEdgePath = path.join(__dirname, '..', 'uploads', shape.avatarEdgeImg);
-      fs.unlink(avatarEdgePath, err => {
-        if (err) console.error(`Error deleting avatarEdgeImg: ${err}`);
-      });
-    }
-    if (shape.avatarAnglesImg) {
-      const avatarAnglesImg = path.join(__dirname, '..', 'uploads', shape.avatarAnglesImg);
-      fs.unlink(avatarAnglesImg, err => {
-        if (err) console.error(`Error deleting avatarAnglesImg: ${err}`);
-      });
-    }
-
+      // Check if shape has an image and remove it
+      if (shape.avatarShapeImg) {
+          const imagePath = path.join(__dirname, "..", "uploads", "shape", shape.avatarShapeImg);
+          console.log(imagePath);
+          if (fs.existsSync(imagePath)) {
+              fs.unlinkSync(imagePath);
+          }
+          }
+          if (shape.avatarEdgeImg) {
+          const imagePath = path.join(__dirname, "..", "uploads", "shape", shape.avatarEdgeImg);
+          console.log(imagePath);
+          if (fs.existsSync(imagePath)) {
+              fs.unlinkSync(imagePath);
+          }
+          }
+          if (shape.avatarAnglesImg) {
+          const imagePath = path.join(__dirname, "..", "uploads", "shape", shape.avatarAnglesImg);
+          console.log(imagePath);
+          if (fs.existsSync(imagePath)) {
+              fs.unlinkSync(imagePath);
+          }
+          }
+      
     if (shape.avatarDimensionsImg) {
-      const avatarDimensionsImg = path.join(__dirname, '..', 'uploads', shape.avatarDimensionsImg);
-      fs.unlink(avatarDimensionsImg, err => {
-        if (err) console.error(`Error deleting avatarDimensionsImg: ${err}`);
-      });
+      const imagePath = path.join(__dirname, "..", "uploads", "shape", shape.avatarDimensionsImg);
+      console.log(imagePath);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
     }
 
-    // Delete shape from database
-    await shape.remove();
+    await Shape.findByIdAndDelete(shapeId);
 
-    return res.status(200).json({ message: 'Shape deleted successfully!' });
+    return res.status(200).json({ message: "Shape deleted successfully", result: true });
   } catch (error) {
-    return res.status(500).json({ message: 'Error deleting shape', error });
+    console.error("Error deleting shape:", error);
+    return res.status(500).json({ message: "Internal server error.", result: false });
   }
 };
 

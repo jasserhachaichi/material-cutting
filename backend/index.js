@@ -19,7 +19,7 @@ app.use(cors({
 }));
 
 // Protect routes
-const { authenticate } = require('./config/ProtectRoutes');
+const { authenticate} = require('./config/ProtectRoutes');
 
 // mongoose Database
 const connectToDB = require("./config/db");
@@ -29,12 +29,18 @@ connectToDB();
 require("./config/autoRefresh");
 
 
-
 app.get('/protected', authenticate, (req, res) => {
-  //console.log("req.client: " + req.client);
-  return res.status(200).json({ message: 'Protected resource accessed', client: req.client, isAuthenticated:true });
-});
+  //console.log("req.verified : ");
+  //console.log(req.verified);
+  return res.status(200).json({ message: 'Protected resource accessed', user: req.verified, isAuthenticated:true });
+}); 
 
+
+/* app.delete('/test/:id', (req, res) => {
+  console.log(req.params.id);
+  console.log(req.body);
+  console.log(req.files);
+}) */
 
 
 app.get('/', (req, res) => {

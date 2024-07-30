@@ -1,5 +1,6 @@
-//const multer = require('multer');
 const Edge = require("./../models/Edge");
+const fs = require("fs");
+const path = require("path");
 
 /**-----------------------------------------------
  * @desc    Create new edge
@@ -48,26 +49,38 @@ const AddEdgeCtrl = async (req, res) => {
  * @access  private     
  ------------------------------------------------*/
  const getEdgesWithPginationCtrl = async (req, res) => {
-    try {
-      const { page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
-      const skip = (page - 1) * limit;
-  
-      const edges = await Edge.find({})
-                                .skip(Number(skip))
-                                .limit(Number(limit));
-  
-      const totalEdges = await Edge.countDocuments();
-  
-      return res.status(200).json({
-        edges,
-        totalEdges,
-        totalPages: Math.ceil(totalEdges / limit),
-        currentPage: Number(page)
-      });
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: 'Error fetching material types', error });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const filterStatus = req.query.status || "";
+
+  try {
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { Edge_name: { $regex: search, $options: "i" } },
+      ];
     }
+
+    if (filterStatus) {
+      query.status = filterStatus;
+    }
+
+    const edges = await Edge.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const count = await Edge.countDocuments(query); // Use the same query for counting documents
+
+    return res.json({
+      edges,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching edges', error });
+  }
   };
 
 /**-----------------------------------------------
@@ -88,5 +101,41 @@ const AddEdgeCtrl = async (req, res) => {
     }
   };
 
-module.exports = { AddEdgeCtrl , getEdgesWithPginationCtrl,getEdgesCtrl};
+
+
+  /**-----------------------------------------------
+ * @desc    Delete edge by ID
+ * @route   /api/deletestaff/:id
+ * @method  DELETE
+ * @access  private
+ ------------------------------------------------*/
+ const deleteEdge = async (req, res) => {
+  const edgeId = req.params.id;
+
+  try {
+    const edge = await Edge.findById(edgeId);
+    if (!edge) {
+      return res.status(404).json({ message: "Edge not found", result: false });
+    }
+
+    // Check if edge has an image and remove it
+    if (edge.avatarEdge) {
+      const imagePath = path.join(__dirname, "..", "uploads", "Edge", edge.avatarEdge);
+      console.log(imagePath);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    await Edge.findByIdAndDelete(edgeId);
+
+    return res.status(200).json({ message: "Edge deleted successfully", result: true });
+  } catch (error) {
+    console.error("Error deleting edge:", error);
+    return res.status(500).json({ message: "Internal server error.", result: false });
+  }
+
+};
+
+module.exports = { AddEdgeCtrl , getEdgesWithPginationCtrl,getEdgesCtrl, deleteEdge};
 
